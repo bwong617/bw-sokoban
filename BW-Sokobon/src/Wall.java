@@ -5,9 +5,9 @@ public class Wall
     
     public Wall (int x, int y, int t)
     {
-		this.x = x;
-		this.y = y;
-		this.t = t; //type
+		this.x = x; // x-coordinate
+		this.y = y; // y-coordinate
+		this.t = t; // type (0: Solid, 1: Movable)
     }
     
 }
