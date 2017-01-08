@@ -1,13 +1,9 @@
-public class Wall
+public class Wall extends Entity
 {
-    
-	int x, y, t;
-    
-    public Wall (int x, int y, int t)
+    public Wall (int x, int y)
     {
-		this.x = x; // x-coordinate
-		this.y = y; // y-coordinate
-		this.t = t; // type (0: Solid, 1: Movable)
+		super(x, y);
+		this.imageURL = "images/Wall_Solid.png";
+		super.loadImage(imageURL);
     }
-    
 }

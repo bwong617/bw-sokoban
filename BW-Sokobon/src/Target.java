@@ -1,12 +1,13 @@
-
-public class Target {
+public class Target extends Entity{
 	
-	int x, y, s;
+	int state;
 	
 	public Target (int x, int y, int s)
     {
-		this.x = x; // x-coordinate
-		this.y = y; // y-coordinate
-		this.s = s; // state
+		super(x, y);
+		this.imageURL = "images/Target.png";
+		super.loadImage(imageURL);
+		this.state = 0;
     }
+	
 }

@@ -1,10 +1,17 @@
 import java.applet.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.Random;
+//import java.util.Random;
 import java.awt.Image;
-import java.io.File;
-import java.net.*;
+//import java.io.File;
+//import java.net.*;
+
+/*TODO
+ * - stage boundary conditions
+ * - sticky when changing directions
+ * - cleanup old code
+ * - make goal entity
+ */
 
 public class Sokobon extends Applet implements KeyListener, Runnable
 {
@@ -12,6 +19,7 @@ public class Sokobon extends Applet implements KeyListener, Runnable
 	int T = R*10; 	//tile dimension
 	
     boolean pressed, left, right, up, down;
+    boolean escape, select;
     boolean leftWall, rightWall, upWall, downWall;
     
     int target_active_count;
@@ -19,8 +27,8 @@ public class Sokobon extends Applet implements KeyListener, Runnable
     boolean level_win;
     boolean level_lose;
     
-    boolean main_menu_active;
-    boolean gameplay_active;
+    AppState state;
+    Direction menu_select_dir;
     
     int stage_x = 0;
     int stage_y = 0;
@@ -35,8 +43,9 @@ public class Sokobon extends Applet implements KeyListener, Runnable
     int window_width = sidebar_x + 50*R;
     int window_height = max_stage_height*T;
     
-    int player_x = stage_x + 3*T;
-    int player_y = stage_y + 3*T;
+    //int player_x = stage_x + 3*T;
+    //int player_y = stage_y + 3*T;
+    Player player = new Player(3*T,3*T);
     
     int goal_x = stage_x + 1*T;
     int goal_y = stage_y + 1*T;
@@ -46,7 +55,7 @@ public class Sokobon extends Applet implements KeyListener, Runnable
     // IMAGES
     Image floor_tile_image, player_image, wall_solid_image, wall_block_image;
     Image wall_block_key_image, wall_block_set_image, target_image, goal_active_image, goal_locked_image;
-    Image sidebar_image, menu_image;
+    Image sidebar_image, menu_image, menu_option_image, menu_option_selected_image;
     
     // FONTS
     Font menu_title_font = new Font("Century Gothic", Font.BOLD, 12*R);
@@ -57,7 +66,7 @@ public class Sokobon extends Applet implements KeyListener, Runnable
     ///////////////////
     int currentLevel = 0;
     boolean beginLevel = false, LevelSelected = false;
-    int oneSecond, gameTime = 0, timeLimit = 10;
+    int oneSecond, gameTime = 0, timeLimit = 100;
 	///////////////////
 
     // GRAPHICS BUFFER
@@ -65,28 +74,46 @@ public class Sokobon extends Applet implements KeyListener, Runnable
     Graphics bg;
     Thread t = null;
     
-
-    int[] [] WallArray = {
-	//  { x, y, t}
-	    { 0, 0, 0}, { 1, 0, 0}, { 2, 0, 0}, { 3, 0, 0}, { 4, 0, 0}, { 5, 0, 0}, { 6, 0, 0}, { 7, 0, 0}, { 8, 0, 0}, { 9, 0, 0},
+    int[][] WallArray = {
+	//  { x, y, type}
+    	{ 0, 0}, { 1, 0}, { 2, 0}, { 3, 0}, { 4, 0}, { 5, 0}, { 6, 0}, { 7, 0}, { 8, 0}, { 9, 0},
+        { 0, 1}, { 9, 1},
+        { 0, 2}, { 9, 2}, 
+        { 0, 3}, { 9, 3},
+        { 0, 4}, { 9, 4}, { 4, 4}, { 5, 4}, 
+        { 0, 5}, { 9, 5}, { 4, 5}, { 5, 5}, 
+        { 0, 6}, { 9, 6}, 
+        { 0, 7}, { 9, 7}, 
+    	{ 0, 8}, { 9, 8},
+    	{ 0, 9}, { 1, 9}, { 2, 9}, { 3, 9}, { 4, 9}, { 5, 9}, { 6, 9}, { 7, 9}, { 8, 9}, { 9, 9}
+	    /*{ 0, 0, 0}, { 1, 0, 0}, { 2, 0, 0}, { 3, 0, 0}, { 4, 0, 0}, { 5, 0, 0}, { 6, 0, 0}, { 7, 0, 0}, { 8, 0, 0}, { 9, 0, 0},
 	    { 0, 1, 0}, { 9, 1, 0},
-	    { 0, 2, 0}, { 9, 2, 0}, { 5, 2, 1}, 
-	    { 0, 3, 0}, { 9, 3, 0}, { 5, 3, 1}, 
+	    { 0, 2, 0}, { 9, 2, 0}, 
+	    { 0, 3, 0}, { 9, 3, 0},
 	    { 0, 4, 0}, { 9, 4, 0}, { 4, 4, 0}, { 5, 4, 0}, 
 	    { 0, 5, 0}, { 9, 5, 0}, { 4, 5, 0}, { 5, 5, 0}, 
-	    { 0, 6, 0}, { 9, 6, 0}, { 5, 6, 1}, 
-	    { 0, 7, 0}, { 9, 7, 0}, { 5, 7, 1}, 
+	    { 0, 6, 0}, { 9, 6, 0}, 
+	    { 0, 7, 0}, { 9, 7, 0}, 
 	    { 0, 8, 0}, { 9, 8, 0},
 	    { 0, 9, 0}, { 1, 9, 0}, { 2, 9, 0}, { 3, 9, 0}, { 4, 9, 0}, { 5, 9, 0}, { 6, 9, 0}, { 7, 9, 0}, { 8, 9, 0}, { 9, 9, 0}
+		*/
 	};
     
-    int[] [] TargetArray = {
-    		//  { x, y, s}
-    		    { 2, 2, 0}, { 7, 2, 0},
-    		    { 2, 7, 0}, { 7, 7, 0}
-    		};
+    int[][] BlockArray = {
+    		{ 5, 2},
+    		{ 5, 3},
+    		{ 5, 6},
+    		{ 5, 7},
+    };
     
+    int[][] TargetArray = {
+    //  { x, y, s}
+    	{ 2, 2, 0}, { 7, 2, 0},
+    	{ 2, 7, 0}, { 7, 7, 0}
+    };
+
     Wall[] WALL = new Wall [WallArray.length];
+    Block[] BLOCK = new Block [BlockArray.length];
     Target[] TARGET = new Target [TargetArray.length];
 
     public void init ()
@@ -106,18 +133,37 @@ public class Sokobon extends Applet implements KeyListener, Runnable
     		FE.printStackTrace();
     	}*/
 		///////////////////////
-
+		
+		//int[][] StageArray = new int[stage_width][stage_height];
+		//for (int i = 0; i < stage_width; i++){
+		//	for (int j = 0; j < stage_height; j++){
+		//		StageArray[i][j] = 0;
+		//	}
+		//}
+		
+		
 		for (int i = 0 ; i < WallArray.length ; i++)
 		{
-		    Wall nWALL = new Wall (stage_x + (WallArray [i] [0])*T, stage_y + (WallArray [i] [1])*T, WallArray [i] [2]);
-		    WALL [i] = nWALL;
+		    //Wall nWALL = new Wall (stage_x + (WallArray [i] [0])*T, stage_y + (WallArray [i] [1])*T, WallArray [i] [2]);
+			Wall nWALL = new Wall (stage_x + (WallArray [i] [0])*T, stage_y + (WallArray [i] [1])*T);
+			WALL [i] = nWALL;
 		}
+		
+		for (int i = 0 ; i < BlockArray.length ; i++)
+		{
+		    Block nBLOCK = new Block (stage_x + (BlockArray [i] [0])*T, stage_y + (BlockArray [i] [1])*T);
+		    BLOCK [i] = nBLOCK;
+		}
+		
 		for (int i = 0 ; i < TargetArray.length ; i++)
 		{
 		    Target nTARGET = new Target (stage_x + (TargetArray [i] [0])*T, stage_y + (TargetArray [i] [1])*T, TargetArray [i] [2]);
 		    TARGET [i] = nTARGET;
 		}
 
+		
+		
+		
 		//floor_image = getImage (getCodeBase (), "images/Floor.png");
 		floor_tile_image = getImage (getCodeBase (), "images/Floor_Tile.png");
 		player_image = getImage (getCodeBase (), "images/Player.png");
@@ -131,9 +177,11 @@ public class Sokobon extends Applet implements KeyListener, Runnable
 		
 		sidebar_image = getImage (getCodeBase (), "images/Sidebar.png");
 		menu_image = getImage (getCodeBase (), "images/Menu.png");
+		menu_option_image = getImage (getCodeBase (), "images/Menu_Option.png");
+		menu_option_selected_image = getImage (getCodeBase (), "images/Menu_Option_Selected.png");
 		
-		main_menu_active = false;
-		gameplay_active = true;
+		state = AppState.GAME_ACTIVE;
+		
 		level_win = false;
 		level_lose = false;
     }
@@ -158,44 +206,131 @@ public class Sokobon extends Applet implements KeyListener, Runnable
     				LevelSpecific ();
     			}*/
 		    	////////////////////////////
-
+		    	
+		    	// GRAPHICS BACKBUFFER
 				bg.setColor (Color.white);
 				bg.fillRect (0, 0, window_width, window_height);
 				//bg.drawImage (floor_image, 0, 0, 10*T, 10*T, this);
-				
-				for (int i = 0 ; i < stage_width ; i++)
-				{
-					for (int j = 0 ; j < stage_height ; j++)
-					{
-						bg.drawImage (floor_tile_image, stage_x + i*T, stage_y + j*T, T, T, this);
-					}
-				}
 				
 				//if (!gameplay_active){
 				//	bg.drawImage (menu_image, stage_x, stage_y, 15*T, 15*T, this);
 				//}
 				
-				if (gameplay_active){
-					WallCollision ();
-					PlayerMovement ();
+//				if (state == State.MAIN_MENU)
+//				{
+//					bg.drawImage (menu_image, stage_x, stage_y, 15*T, 15*T, this);
+//					repaint ();
+//				}
+				if (state == AppState.GAME_ACTIVE)
+				{
+					// DRAW STAGE
+					for (int i = 0 ; i < stage_width ; i++)
+					{
+						for (int j = 0 ; j < stage_height ; j++)
+						{
+							bg.drawImage (floor_tile_image, stage_x + i*T, stage_y + j*T, T, T, this);
+						}
+					}
+					
+					// GAMEPLAY FUNCTIONS
+					
+					// Player -> Solid Wall
+					// Player -> Block
+						// Block -> Solid Wall
+						// Block -> Block
+					
+					if (player.move_dir != Direction.NONE){
+						for (int i = 0 ; i < WallArray.length ; i++)
+						{
+							if (Entity.EntityCollision(player, WALL[i], player.move_dir, T))
+								player.move_dir = Direction.NONE;
+						}
+					}
+					if (player.move_dir != Direction.NONE)
+					{
+						for (int i = 0 ; i < BlockArray.length ; i++)
+						{
+							if (Entity.EntityCollision(player, BLOCK[i], player.move_dir, T)){
+								for (int j = 0 ; j < WallArray.length ; j++)
+								{
+									if (Entity.EntityCollision(BLOCK[i], WALL[j], player.move_dir, T))
+										player.move_dir = Direction.NONE;
+								}
+								for (int j = 0 ; j < BlockArray.length ; j++)
+								{
+									if (Entity.EntityCollision(BLOCK[i], BLOCK[j], player.move_dir, T))
+										player.move_dir = Direction.NONE;
+								}
+								if (player.move_dir != Direction.NONE)
+									MoveEntity(BLOCK[i], player.move_dir);
+							}
+						}
+					}
+					
+					for (int i = 0 ; i < WallArray.length ; i++)
+						bg.drawImage (WALL [i].image, WALL [i].x, WALL [i].y, T, T, this);
+					for (int i = 0 ; i < BlockArray.length ; i++)
+						bg.drawImage (BLOCK [i].image, BLOCK [i].x, BLOCK [i].y, T, T, this);
+					
+					MoveEntity(player, player.move_dir);
+					
+					bg.drawImage (player.image, player.x, player.y, T, T, this);
+					
+					//////
+					
+					
+					//WallCollision ();
+					//PlayerMovement ();
 					CheckTargets ();
 					UpdateTimer ();
 					
 					repaint ();
 					
-					if (level_win || level_lose)
-						gameplay_active = false;
+					if (level_win)
+						state = AppState.GAME_WIN;
+					if (level_lose)
+						state = AppState.GAME_LOSE;
 				}
-				while (!gameplay_active){
-					bg.drawImage (menu_image, stage_x, stage_y, 15*T, 15*T, this);
+				else if (state == AppState.GAME_LOSE)
+				{
+					while (true){
+						bg.drawImage (menu_image, stage_x, stage_y, 15*T, 15*T, this);
+						repaint ();
+					}
 				}
 				
 				Thread.sleep (100);
-			    }
 			}
+		}
 		catch (InterruptedException ie){}
     }
     
+    public void MoveEntity (Entity E, Direction dir){
+    	switch (dir){
+    	case LEFT:
+    		// if the player will not exit the stage boundaries
+    		if (E.x > stage_x)
+    			// move the player left one tile
+    			E.x -= T;
+    		break;
+    	case RIGHT:
+    		if (E.x < stage_x + (stage_width - 1)*T)
+    			E.x += T;
+    		break;
+    	case UP:
+    		if (E.y > stage_y)
+    			E.y -= T;
+    		break;
+    	case DOWN:
+    		if (E.y < stage_y + (stage_height - 1)*T)
+    			E.y += T;
+    		break;
+    	case NONE:
+    		break;
+    	}
+    }
+    
+    /*
     public void WallCollision ()
     {
     	leftWall = false;
@@ -206,7 +341,7 @@ public class Sokobon extends Applet implements KeyListener, Runnable
 		// for each wall entity
 		for (int i = 0 ; i < WallArray.length ; i++)
 		{
-			if (WALL [i].t == 0) // Type 0: Solid Wall
+			if (WALL [i].type == 0) // Type 0: Solid Wall
     		{
 				// if the player is trying to go left
 				if (left)
@@ -234,7 +369,7 @@ public class Sokobon extends Applet implements KeyListener, Runnable
 				// draw the wall
 				bg.drawImage (wall_solid_image, WALL [i].x, WALL [i].y, T, T, this);
     		}
-			else if (WALL [i].t == 1) // Type 1: Movable Block
+			else if (WALL [i].type == 1) // Type 1: Movable Block
     		{
 				// if the player is trying to go left
 				if (left)
@@ -310,7 +445,7 @@ public class Sokobon extends Applet implements KeyListener, Runnable
     		}
 		}
     }
-    
+    */
     /*
     public void WallCollision ()
     {
@@ -375,34 +510,36 @@ public class Sokobon extends Applet implements KeyListener, Runnable
 		}
     }  
     */
+    /*
     public void PlayerMovement () // cannot up/down if against a side wall
     {
     	// if the player is trying to go left
-    	if (left)
-    	{
+    	switch (player.move_dir){
+    	case LEFT:
     		// if the player will not exit the stage boundaries
-    		if (player_x > stage_x && !leftWall)
+    		if (player.x > stage_x && !leftWall)
     			// move the player left one tile
-    			player_x -= T;
+    			player.x -= T;
+    		break;
+    	case RIGHT:
+    		if (player.x < stage_x + (stage_width - 1)*T && !rightWall)
+    			player.x += T;
+    		break;
+    	case UP:
+    		if (player.y > stage_y && !upWall)
+    			player.y -= T;
+    		break;
+    	case DOWN:
+    		if (player.y < stage_y + (stage_height - 1)*T && !downWall)
+    			player.y += T;
+    		break;
+    	case NONE:
+    		break;
     	}
-    	else if (right)
-    	{
-    		if (player_x < stage_x + (stage_width - 1)*T && !rightWall)
-				player_x += T;
-    	}	
-		else if (up)
-		{
-			if (player_y > stage_y && !upWall)
-				player_y -= T;
-		}		
-		else if (down)
-		{
-			if (player_y < stage_y + (stage_height - 1)*T && !downWall)
-				player_y += T;
-		}
 	    // draw the player
-		bg.drawImage (player_image, player_x, player_y, T, T, this);
+		bg.drawImage (player.image, player.x, player.y, T, T, this);
     }
+    */
     
     public void CheckTargets ()
     {
@@ -410,19 +547,20 @@ public class Sokobon extends Applet implements KeyListener, Runnable
     	
     	for (int i = 0 ; i < TargetArray.length ; i++)
 		{
-    		TARGET [i].s = 0;
+    		TARGET [i].state = 0;
 			//bg.drawImage (target_image_inactive, TARGET [i].x, TARGET [i].y, T, T, this);
 			
-    		for (int j = 0; j < WallArray.length; j++)
+    		for (int j = 0; j < BlockArray.length; j++)
     		{
-    			if (WALL [j].t == 1 && WALL [j].x == TARGET [i].x && WALL [j].y == TARGET [i].y)
+    			if (Entity.EntityOverlap(BLOCK[j], TARGET[i]))
     			{
-    				TARGET [i].s = 1;
-    				bg.drawImage (wall_block_set_image, WALL [j].x, WALL [j].y, T, T, this);
+    				TARGET[i].state = 1;
+    				BLOCK[j].setImage(TARGET[i].state);
+    				bg.drawImage (BLOCK [j].image, BLOCK [j].x, BLOCK [j].y, T, T, this);
     				target_active_count++;
     			}
     		}
-    		bg.drawImage (target_image, TARGET [i].x, TARGET [i].y, T, T, this);
+    		bg.drawImage (TARGET [i].image, TARGET [i].x, TARGET [i].y, T, T, this);
 		}
     	
     	if (target_active_count == TargetArray.length)
@@ -436,7 +574,7 @@ public class Sokobon extends Applet implements KeyListener, Runnable
     		bg.drawImage (goal_locked_image, goal_x, goal_y, T, T, this);
     	}
     	
-    	if (goal_active && player_x == goal_x && player_y == goal_y)
+    	if (goal_active && player.x == goal_x && player.y == goal_y)
     		level_win = true;
     		
     }
@@ -462,34 +600,45 @@ public class Sokobon extends Applet implements KeyListener, Runnable
     
     public void keyPressed (KeyEvent e){
     	int key = e.getKeyCode ();
-    	if (main_menu_active){
-    		if (key == KeyEvent.VK_LEFT 	|| key == KeyEvent.VK_A)	{pressed = true; left = true;}
+    	if (state == AppState.MAIN_MENU){
+    		if (key == KeyEvent.VK_ENTER)								{pressed = true; select = true;}
     		if (key == KeyEvent.VK_UP 		|| key == KeyEvent.VK_W)	{pressed = true; up = true;}
+    		if (key == KeyEvent.VK_DOWN 	|| key == KeyEvent.VK_S)	{pressed = true; down = true;}
+    		
+    		if (key == KeyEvent.VK_LEFT 	|| key == KeyEvent.VK_A)	{pressed = true; left = true;}
     		if (key == KeyEvent.VK_RIGHT 	|| key == KeyEvent.VK_D)	{pressed = true; right = true;}
+    	}
+    	else if (state == AppState.GAME_ACTIVE){
+    		if (key == KeyEvent.VK_UP 		|| key == KeyEvent.VK_W)	{player.move_dir = Direction.UP;}
+    		if (key == KeyEvent.VK_LEFT 	|| key == KeyEvent.VK_A)	{player.move_dir = Direction.LEFT;}
+    		if (key == KeyEvent.VK_DOWN 	|| key == KeyEvent.VK_S)	{player.move_dir = Direction.DOWN;}
+    		if (key == KeyEvent.VK_RIGHT 	|| key == KeyEvent.VK_D)	{player.move_dir = Direction.RIGHT;}
+    		
+    		if (key == KeyEvent.VK_ESCAPE)								{pressed = true; escape = true;}
+        }
+    	else if (state == AppState.VIEW_PAGE){
+    		if (key == KeyEvent.VK_ESCAPE)								{pressed = true; escape = true;}
+    	}
+    	else {
+    		if (key == KeyEvent.VK_UP 		|| key == KeyEvent.VK_W)	{pressed = true; up = true;}
     		if (key == KeyEvent.VK_DOWN 	|| key == KeyEvent.VK_S)	{pressed = true; down = true;}
         }
-    	if (gameplay_active){
-    		if (key == KeyEvent.VK_LEFT 	|| key == KeyEvent.VK_A)	{pressed = true; left = true;}
-    		if (key == KeyEvent.VK_UP 		|| key == KeyEvent.VK_W)	{pressed = true; up = true;}
-    		if (key == KeyEvent.VK_RIGHT 	|| key == KeyEvent.VK_D)	{pressed = true; right = true;}
-    		if (key == KeyEvent.VK_DOWN 	|| key == KeyEvent.VK_S)	{pressed = true; down = true;}
-        }
+    	
     }
     
     public void keyReleased (KeyEvent e){
 	    int key = e.getKeyCode ();
-	    if (main_menu_active){
-	    	if (key == KeyEvent.VK_LEFT 	|| key == KeyEvent.VK_A)	{pressed = false; left = false;}
-			if (key == KeyEvent.VK_UP 		|| key == KeyEvent.VK_W)	{pressed = false; up = false;}
-			if (key == KeyEvent.VK_RIGHT 	|| key == KeyEvent.VK_D)	{pressed = false; right = false;}
-			if (key == KeyEvent.VK_DOWN 	|| key == KeyEvent.VK_S)	{pressed = false; down = false;}
-	    }
-	    if (gameplay_active){
-	    	if (key == KeyEvent.VK_LEFT 	|| key == KeyEvent.VK_A)	{pressed = false; left = false;}
-			if (key == KeyEvent.VK_UP 		|| key == KeyEvent.VK_W)	{pressed = false; up = false;}
-			if (key == KeyEvent.VK_RIGHT 	|| key == KeyEvent.VK_D)	{pressed = false; right = false;}
-			if (key == KeyEvent.VK_DOWN 	|| key == KeyEvent.VK_S)	{pressed = false; down = false;}
-	    }
+
+	    if (key == KeyEvent.VK_LEFT 	|| key == KeyEvent.VK_A ||
+			key == KeyEvent.VK_UP 		|| key == KeyEvent.VK_W ||
+			key == KeyEvent.VK_RIGHT 	|| key == KeyEvent.VK_D ||
+			key == KeyEvent.VK_DOWN 	|| key == KeyEvent.VK_S)
+		{
+	    	player.move_dir = Direction.NONE;
+	    	menu_select_dir = Direction.NONE;
+		}
+		if (key == KeyEvent.VK_ENTER)								{pressed = false; select = false;}
+		if (key == KeyEvent.VK_ESCAPE)								{pressed = false; escape = false;}
     }
     
     public void keyTyped (KeyEvent e)
@@ -498,12 +647,12 @@ public class Sokobon extends Applet implements KeyListener, Runnable
     
     public void update (Graphics g)
     {
-	g.drawImage (backbuffer, 0, 0, this);
+    	g.drawImage (backbuffer, 0, 0, this);
     }
     
     public void paint (Graphics g)
     {
-	update (g);
+    	update (g);
     }
 }
 
@@ -926,13 +1075,11 @@ public class Gamma_Jaeve extends Applet implements KeyListener, Runnable
 	update (g);
     }
 }
+
+
 */
-
-enum a
-{
-}
-
 /*
+
 package shenanigans;
 
 import java.applet.*;

@@ -1,5 +1,6 @@
 import java.util.*;
 import java.io.*;
+
 public class Import_Level_Data {
     ArrayList<Wall> walls = new ArrayList<Wall>();		// creates resizable arraylists
     int levelNum;
@@ -34,7 +35,7 @@ public class Import_Level_Data {
         	int x = scan.nextInt();		// other integers in a line correspond to
         	int y = scan.nextInt();		// object information such as location and type
         	int type = scan.nextInt();
-        	Wall WALL = new Wall (x, y, type);
+        	Wall WALL = new Wall (x, y);
         	walls.add (WALL);			// a new object is created according to the data
         	break;
         }
